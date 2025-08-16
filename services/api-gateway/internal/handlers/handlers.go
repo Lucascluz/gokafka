@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -67,43 +66,28 @@ func (h *Handler) listenResponses(reader *kafka.Reader) {
 }
 
 func (h *Handler) Test(c *gin.Context) {
-	correlationID := uuid.NewString()
-	replyChan := make(chan []byte, 1)
+	// Initialize helper services
+	respHandler := NewResponseHandler(c)
+	messaging := NewMessagingService(h)
 
-	h.mu.Lock()
-	h.responseChans[correlationID] = replyChan
-	h.mu.Unlock()
-	defer func() {
-		h.mu.Lock()
-		delete(h.responseChans, correlationID)
-		h.mu.Unlock()
-	}()
-
-	req := map[string]interface{}{
-		"correlation_id": correlationID,
-		"reply_to":       "user-service-topic",
-		"payload":        "hello world",
-	}
-	reqBytes, _ := json.Marshal(req)
-
-	err := h.writer.WriteMessages(context.Background(),
-		kafka.Message{Key: []byte("key"), Value: reqBytes},
-	)
+	// Send test message
+	resp, err := messaging.SendAndWait(SendRequest{
+		Type:    "test",
+		Payload: "hello world",
+		Key:     "key",
+		ReplyTo: "user-service-topic",
+		Timeout: 5 * time.Second,
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respHandler.HandleError(http.StatusInternalServerError, err.Error())
 		return
 	}
-	select {
-	case resp := <-replyChan:
-		var respObj map[string]interface{}
-		if err := json.Unmarshal(resp, &respObj); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid response format"})
-			return
-		}
-		c.JSON(http.StatusOK, respObj)
-	case <-time.After(5 * time.Second):
-		c.JSON(http.StatusGatewayTimeout, gin.H{"error": "timeout waiting for response"})
+
+	// Return raw response for test endpoint
+	var respObj map[string]interface{}
+	if err := json.Unmarshal([]byte(resp.Data), &respObj); err != nil {
+		respHandler.HandleError(http.StatusInternalServerError, "invalid response format")
+		return
 	}
+	c.JSON(http.StatusOK, respObj)
 }
-
-

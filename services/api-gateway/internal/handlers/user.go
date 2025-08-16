@@ -1,358 +1,71 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-
 	shared "github.com/lucas/gokafka/shared/models"
-	"github.com/segmentio/kafka-go"
 )
 
-func (h *Handler) RegisterUser(c *gin.Context) {
-	// Parse request body
-	var registerReq shared.RegisterRequest
-	if err := c.ShouldBindJSON(&registerReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Validate request
-	if registerReq.Email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
-		return
-	}
-	if registerReq.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password is required"})
-		return
-	}
-	if registerReq.FirstName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "First name is required"})
-		return
-	}
-	if registerReq.LastName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Last name is required"})
-		return
-	}
-
-	// Generate correlation ID for tracking the request
-	correlationID := uuid.NewString()
-	replyChan := make(chan []byte, 1)
-
-	// Store the reply channel
-	h.mu.Lock()
-	h.responseChans[correlationID] = replyChan
-	h.mu.Unlock()
-	defer func() {
-		h.mu.Lock()
-		delete(h.responseChans, correlationID)
-		h.mu.Unlock()
-	}()
-
-	// Convert register request to JSON string for payload
-	payloadBytes, err := json.Marshal(registerReq)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to serialize request",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Create Kafka request message
-	kafkaReq := shared.Request{
-		Type:          "register",
-		CorrelationID: correlationID,
-		ReplyTo:       "user-service-topic",
-		Payload:       string(payloadBytes),
-	}
-
-	// Send message to user-service via Kafka
-	reqBytes, _ := json.Marshal(kafkaReq)
-	err = h.writer.WriteMessages(context.Background(),
-		kafka.Message{
-			Key:   []byte("user-register"),
-			Value: reqBytes,
-		},
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to send message to user service",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Wait for response from user-service
-	select {
-	case resp := <-replyChan:
-		var respObj shared.Response
-		if err := json.Unmarshal(resp, &respObj); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "Invalid response format from user service",
-				"details": err.Error(),
-			})
-			return
-		}
-
-		// Try to parse the response data as JSON, otherwise return as string
-		var responseData any
-		if err := json.Unmarshal([]byte(respObj.Data), &responseData); err != nil {
-			// If it's not valid JSON, return as string
-			responseData = respObj.Data
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message":        "User registration processed",
-			"correlation_id": respObj.CorrelationID,
-			"data":           responseData,
-		})
-
-	case <-time.After(10 * time.Second):
-		c.JSON(http.StatusGatewayTimeout, gin.H{
-			"error": "Timeout waiting for response from user service",
-		})
-	}
-}
-
-func (h *Handler) LoginUser(c *gin.Context) {
-	// Parse request body
-	var loginReq shared.LoginRequest
-	if err := c.ShouldBindJSON(&loginReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request format",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Validate request
-	if loginReq.Email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
-		return
-	}
-	if loginReq.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password is required"})
-		return
-	}
-
-	// Generate correlation ID for tracking the request
-	correlationID := uuid.NewString()
-	replyChan := make(chan []byte, 1)
-
-	// Store the reply channel
-	h.mu.Lock()
-	h.responseChans[correlationID] = replyChan
-	h.mu.Unlock()
-	defer func() {
-		h.mu.Lock()
-		delete(h.responseChans, correlationID)
-		h.mu.Unlock()
-	}()
-
-	// Convert login request to JSON string for payload
-	payloadBytes, err := json.Marshal(loginReq)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to serialize request",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Create Kafka request message
-	kafkaReq := shared.Request{
-		Type:          "login",
-		CorrelationID: correlationID,
-		ReplyTo:       "user-service-topic",
-		Payload:       string(payloadBytes),
-	}
-
-	// Send message to user-service via Kafka
-	reqBytes, _ := json.Marshal(kafkaReq)
-	err = h.writer.WriteMessages(context.Background(),
-		kafka.Message{
-			Key:   []byte("user-login"),
-			Value: reqBytes,
-		},
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to send message to user service",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Wait for response from user-service
-	select {
-	case resp := <-replyChan:
-		var respObj shared.Response
-		if err := json.Unmarshal(resp, &respObj); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "Invalid response format from user service",
-				"details": err.Error(),
-			})
-			return
-		}
-
-		// Check if login was successful
-		if respObj.Success {
-			// Parse the login response which should contain the token
-			var loginResponse shared.LoginResponse
-			if err := json.Unmarshal([]byte(respObj.Data), &loginResponse); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "Invalid login response format",
-					"details": err.Error(),
-				})
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Login successful",
-				"token":   loginResponse.Token,
-				"data": gin.H{
-					"id":         loginResponse.Data.ID,
-					"email":      loginResponse.Data.Email,
-					"first_name": loginResponse.Data.FirstName,
-					"last_name":  loginResponse.Data.LastName,
-				},
-			})
-		} else {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": respObj.Error,
-			})
-		}
-
-	case <-time.After(10 * time.Second):
-		c.JSON(http.StatusGatewayTimeout, gin.H{
-			"error": "Timeout waiting for response from user service",
-		})
-	}
-}
-
-func (h *Handler) LogoutUser(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "method not implemented"})
-}
-
 func (h *Handler) GetUserProfile(c *gin.Context) {
+	// Initialize helper services
+	respHandler := NewResponseHandler(c)
+	messaging := NewMessagingService(h)
+
 	// Get user ID from context (set by middleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		respHandler.HandleError(http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
 	userIDStr, ok := userID.(string)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format"})
+		respHandler.HandleError(http.StatusInternalServerError, "Invalid user ID format")
 		return
 	}
-
-	// Generate correlation ID for tracking the request
-	correlationID := uuid.NewString()
-	replyChan := make(chan []byte, 1)
-
-	// Store the reply channel
-	h.mu.Lock()
-	h.responseChans[correlationID] = replyChan
-	h.mu.Unlock()
-	defer func() {
-		h.mu.Lock()
-		delete(h.responseChans, correlationID)
-		h.mu.Unlock()
-	}()
 
 	// Create request with just the user ID
 	profileReq := shared.GetProfileRequest{
 		ID: userIDStr,
 	}
 
-	// Convert request to JSON string for payload
-	payloadBytes, err := json.Marshal(profileReq)
+	// Send request to user service
+	resp, err := messaging.SendAndWait(SendRequest{
+		Type:    "get-user-profile",
+		Payload: profileReq,
+		Key:     "get-user-profile",
+		ReplyTo: "user-service-topic",
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to serialize request",
-			"details": err.Error(),
-		})
+		respHandler.HandleError(http.StatusInternalServerError, "Failed to send message to user service", err.Error())
 		return
 	}
 
-	// Create Kafka request message
-	kafkaReq := shared.Request{
-		Type:          "get-user-profile",
-		CorrelationID: correlationID,
-		ReplyTo:       "user-service-topic",
-		Payload:       string(payloadBytes),
-	}
-
-	// Send message to user-service via Kafka
-	reqBytes, _ := json.Marshal(kafkaReq)
-	err = h.writer.WriteMessages(context.Background(),
-		kafka.Message{
-			Key:   []byte("get-user-profile"),
-			Value: reqBytes,
-		},
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to send message to user service",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// Wait for response from user-service
-	select {
-	case resp := <-replyChan:
-		var respObj shared.Response
-		if err := json.Unmarshal(resp, &respObj); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "Invalid response format from user service",
-				"details": err.Error(),
-			})
+	// Handle profile-specific response
+	if resp.Success {
+		// Parse the profile response
+		var profileRes shared.GetProfileResponse
+		if err := json.Unmarshal([]byte(resp.Data), &profileRes); err != nil {
+			respHandler.HandleError(http.StatusInternalServerError, "Invalid response format", err.Error())
 			return
 		}
 
-		// Check if profile request was successful
-		if respObj.Success {
-			// Parse the profile response
-			var profileRes shared.GetProfileResponse
-			if err := json.Unmarshal([]byte(respObj.Data), &profileRes); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "Invalid response format",
-					"details": err.Error(),
-				})
-				return
-			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"message": "User profile retrieved successfully",
-				"data": gin.H{
-					"id":         profileRes.Data.ID,
-					"email":      profileRes.Data.Email,
-					"first_name": profileRes.Data.FirstName,
-					"last_name":  profileRes.Data.LastName,
-					"created_at": profileRes.Data.CreatedAt,
-					"updated_at": profileRes.Data.UpdatedAt,
-				},
-			})
-		} else {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": respObj.Error,
-			})
-		}
-
-	case <-time.After(10 * time.Second):
-		c.JSON(http.StatusGatewayTimeout, gin.H{
-			"error": "Timeout waiting for response from user service",
+		c.JSON(http.StatusOK, gin.H{
+			"message": "User profile retrieved successfully",
+			"data": gin.H{
+				"id":         profileRes.Data.ID,
+				"email":      profileRes.Data.Email,
+				"first_name": profileRes.Data.FirstName,
+				"last_name":  profileRes.Data.LastName,
+				"created_at": profileRes.Data.CreatedAt,
+				"updated_at": profileRes.Data.UpdatedAt,
+			},
+		})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": resp.Error,
 		})
 	}
 }
