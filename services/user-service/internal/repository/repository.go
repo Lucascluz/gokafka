@@ -5,6 +5,7 @@ import (
 	"log"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
+	sharedModels "github.com/lucas/gokafka/shared/models"
 	"github.com/lucas/gokafka/user-service/internal/models"
 )
 
@@ -86,6 +87,25 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 	)
 
 	return err
+}
+
+func (r *UserRepository) GetUserByID(id string) ([]*sharedModels.UserData, error) {
+	query := `
+		SELECT id, email, first_name, last_name, created_at, updated_at 
+		FROM users WHERE id = $1
+	`
+
+	var user sharedModels.UserData
+	err := r.db.QueryRow(query, id).Scan(
+		&user.ID, &user.Email, &user.FirstName,
+		&user.LastName, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return []*sharedModels.UserData{&user}, nil
 }
 
 func (r *UserRepository) GetAllUsers() ([]*models.User, error) {

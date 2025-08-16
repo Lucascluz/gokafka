@@ -1,14 +1,12 @@
 package models
 
-type LoginResponse struct {
-	Token string `json:"token"`
-	User  User   `json:"user"`
-}
-
-type User struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+type UserData struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type LoginRequest struct {
@@ -16,9 +14,23 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+type LoginResponse struct {
+	Token string   `json:"token"`
+	Data  UserData `json:"data"`
+}
+
 type RegisterRequest struct {
 	Email     string `json:"email"`
 	Password  string `json:"password"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+}
+
+type GetProfileRequest struct {
+	ID string `json:"id"`
+}
+
+type GetProfileResponse struct {
+	Status string   `json:"status"`
+	Data   UserData `json:"data"`
 }

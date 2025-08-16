@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -24,12 +25,17 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		log.Printf("Extracted token: %s", tokenString)
+
 		claims, err := auth.ValidateToken(tokenString)
 		if err != nil {
+			log.Printf("Token validation failed: %v", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
 		}
+
+		log.Printf("Token validated successfully for user: %s", claims.UserID)
 
 		// Set user info in context for downstream handlers
 		c.Set("user_id", claims.UserID)

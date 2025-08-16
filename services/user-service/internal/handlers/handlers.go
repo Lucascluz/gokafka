@@ -107,13 +107,79 @@ func (h *UserServiceHandler) ListenMessages() {
 					}
 				}
 			}
+
+		case "get-user-profile":
+			// Parse the request from payload
+			var getProfileReq models.GetProfileRequest
+			if err := json.Unmarshal([]byte(req.Payload), &getProfileReq); err != nil {
+				log.Printf("Failed to parse get profile request: %v", err)
+				resp = models.Response{
+					CorrelationID: req.CorrelationID,
+					Success:       false,
+					Error:         "Invalid get profile request format",
+				}
+			} else {
+				// Handle get profile logic here
+				result, err := h.service.GetUserProfile(getProfileReq.ID)
+				if err != nil {
+					log.Printf("Failed to get user profile: %v", err)
+					resp = models.Response{
+						CorrelationID: req.CorrelationID,
+						Success:       false,
+						Error:         err.Error(),
+					}
+				} else {
+					// Create response structure
+					profileResponse := models.GetProfileResponse{
+						Status: "success",
+						Data:   *result,
+					}
+					// Return success response with user data
+					resultBytes, _ := json.Marshal(profileResponse)
+					resp = models.Response{
+						CorrelationID: req.CorrelationID,
+						Success:       true,
+						Data:          string(resultBytes),
+					}
+				}
+			}
 		case "logout":
 			// Handle logout
 			resp = models.Response{
 				CorrelationID: req.CorrelationID,
 				Data:          "User logged out: " + req.Payload,
 			}
-		case "get_all":
+		case "get-by-id":
+			// Parse the request from payload
+			var getProfileReq models.GetProfileRequest
+			if err := json.Unmarshal([]byte(req.Payload), &getProfileReq); err != nil {
+				log.Printf("Failed to parse request: %v", err)
+				resp = models.Response{
+					CorrelationID: req.CorrelationID,
+					Success:       false,
+					Error:         "Invalid request format",
+				}
+			} else {
+				// Handle logic here
+				result, err := h.service.GetUserProfile(getProfileReq.ID)
+				if err != nil {
+					log.Printf("Failed to get user profile: %v", err)
+					resp = models.Response{
+						CorrelationID: req.CorrelationID,
+						Success:       false,
+						Error:         err.Error(),
+					}
+				} else {
+					// Return success response with user data
+					resultBytes, _ := json.Marshal(result)
+					resp = models.Response{
+						CorrelationID: req.CorrelationID,
+						Success:       true,
+						Data:          string(resultBytes),
+					}
+				}
+			}
+		case "get-all":
 			// Handle get all users
 			resp = models.Response{
 				CorrelationID: req.CorrelationID,

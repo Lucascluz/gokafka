@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lucas/gokafka/shared/auth"
-	"github.com/lucas/gokafka/shared/models"
+	sharedModels "github.com/lucas/gokafka/shared/models"
 	userAuth "github.com/lucas/gokafka/user-service/internal/auth"
 	userModels "github.com/lucas/gokafka/user-service/internal/models"
 	"github.com/lucas/gokafka/user-service/internal/repository"
@@ -22,7 +22,7 @@ func NewUserService(repo *repository.UserRepository) *UserService {
 	}
 }
 
-func (s *UserService) RegisterUser(req models.RegisterRequest) (*userModels.User, error) {
+func (s *UserService) RegisterUser(req sharedModels.RegisterRequest) (*userModels.User, error) {
 	// Validate input
 	if req.Email == "" || req.Password == "" || req.FirstName == "" || req.LastName == "" {
 		return nil, fmt.Errorf("all fields are required")
@@ -71,7 +71,7 @@ func (s *UserService) RegisterUser(req models.RegisterRequest) (*userModels.User
 	return userResponse, nil
 }
 
-func (s *UserService) LoginUser(req models.LoginRequest) (*models.LoginResponse, error) {
+func (s *UserService) LoginUser(req sharedModels.LoginRequest) (*sharedModels.LoginResponse, error) {
 	// Validate input
 	if req.Email == "" || req.Password == "" {
 		return nil, fmt.Errorf("email and password are required")
@@ -95,14 +95,40 @@ func (s *UserService) LoginUser(req models.LoginRequest) (*models.LoginResponse,
 	}
 
 	// Prepare response
-	loginResponse := &models.LoginResponse{
+	loginResponse := &sharedModels.LoginResponse{
 		Token: token,
-		User: models.User{
-			ID:    user.ID,
-			Email: user.Email,
-			Role:  user.Role,
+		Data: sharedModels.UserData{
+			ID:        user.ID,
+			Email:     user.Email,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
 		},
 	}
 
 	return loginResponse, nil
+}
+
+func (s *UserService) GetUserProfile(userID string) (*sharedModels.UserData, error) {
+	// Validate input
+	if userID == "" {
+		return nil, fmt.Errorf("user ID is required")
+	}
+
+	// Get user by ID
+	users, err := s.repo.GetUserByID(userID)
+	if err != nil || len(users) == 0 {
+		return nil, fmt.Errorf("user not found")
+	}
+	user := users[0]
+
+	// Create a copy of user without password for security
+	userResponse := &sharedModels.UserData{
+		ID:        user.ID,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}
+	return userResponse, nil
 }
