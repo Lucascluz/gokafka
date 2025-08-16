@@ -5,22 +5,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lucas/gokafka/shared/auth"
 	"github.com/lucas/gokafka/shared/models"
-	"github.com/lucas/gokafka/user-service/internal/auth"
+	userAuth "github.com/lucas/gokafka/user-service/internal/auth"
 	userModels "github.com/lucas/gokafka/user-service/internal/models"
 	"github.com/lucas/gokafka/user-service/internal/repository"
-	"github.com/lucas/gokafka/user-service/internal/session"
 )
 
 type UserService struct {
-	repo         repository.UserRepository
-	sessionStore *session.RedisSessionStore
+	repo repository.UserRepository
 }
 
-func NewUserService(repo *repository.UserRepository, sessionStore *session.RedisSessionStore) *UserService {
+func NewUserService(repo *repository.UserRepository) *UserService {
 	return &UserService{
-		repo:         *repo,
-		sessionStore: sessionStore,
+		repo: *repo,
 	}
 }
 
@@ -37,7 +35,7 @@ func (s *UserService) RegisterUser(req models.RegisterRequest) (*userModels.User
 	}
 
 	// Hash password
-	hashedPassword, err := auth.HashPassword(req.Password)
+	hashedPassword, err := userAuth.HashPassword(req.Password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -86,7 +84,7 @@ func (s *UserService) LoginUser(req models.LoginRequest) (*models.LoginResponse,
 	}
 
 	// Check password
-	if !auth.CheckPassword(req.Password, user.Password) {
+	if !userAuth.CheckPassword(req.Password, user.Password) {
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
@@ -96,16 +94,9 @@ func (s *UserService) LoginUser(req models.LoginRequest) (*models.LoginResponse,
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
 
-	// Create session in Redis
-	sessionID, err := s.sessionStore.CreateSession(user.ID, user.Email, user.Role)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
-	}
-
 	// Prepare response
 	loginResponse := &models.LoginResponse{
-		Token:     token,
-		SessionID: sessionID,
+		Token: token,
 		User: models.User{
 			ID:    user.ID,
 			Email: user.Email,

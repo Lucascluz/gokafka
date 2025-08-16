@@ -6,7 +6,6 @@ import (
 	"github.com/lucas/gokafka/user-service/internal/handlers"
 	"github.com/lucas/gokafka/user-service/internal/repository"
 	"github.com/lucas/gokafka/user-service/internal/services"
-	"github.com/lucas/gokafka/user-service/internal/session"
 )
 
 func main() {
@@ -16,11 +15,8 @@ func main() {
 	// Initialize the user repository
 	repo := repository.NewUserRepository()
 
-	// Initialize Redis session store
-	sessionStore := session.NewRedisSessionStore("localhost:6379", "", 0)
-
 	// Initialize the user service
-	service := services.NewUserService(repo, sessionStore)
+	service := services.NewUserService(repo)
 
 	// Initialize the user service handler
 	handler := handlers.NewUserServiceHandler(service)

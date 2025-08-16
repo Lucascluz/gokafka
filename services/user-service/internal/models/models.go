@@ -11,15 +11,6 @@ type User struct {
 	Role      string `json:"role"`
 }
 
-type Session struct {
-	ID        string `json:"id"`
-	UserID    string `json:"user_id"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-	ExpiresAt string `json:"expires_at"`
-	Role	  string `json:"role"`
-}
-
 type Request struct {
 	Type          string `json:"type"` // e.g., "register", "login", etc.
 	CorrelationID string `json:"correlation_id"`

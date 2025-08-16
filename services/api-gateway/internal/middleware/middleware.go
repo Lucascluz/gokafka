@@ -5,17 +5,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/lucas/gokafka/shared/auth"
 )
-
-type Claims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
-	jwt.RegisteredClaims
-}
-
-var jwtSecret = []byte("your-secret-key") // Move this to shared config or env
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -33,12 +24,8 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
-			return jwtSecret, nil
-		})
-
-		if err != nil || !token.Valid {
+		claims, err := auth.ValidateToken(tokenString)
+		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return

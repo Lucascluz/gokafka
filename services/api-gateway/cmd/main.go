@@ -17,6 +17,11 @@ func main() {
 	{
 		auth.POST("/register", handlers.RegisterUser)
 		auth.POST("/login", handlers.LoginUser)
+
+		auth.Use(middleware.AuthMiddleware())
+		{
+			auth.POST("/logout", handlers.LogoutUser)
+		}
 	}
 
 	// Protected routes for authenticated users
