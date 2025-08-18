@@ -1,0 +1,34 @@
+# Docker ignore for API Gateway
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temp files
+*.log
+*.pid
+tmp/
+temp/
+
+# Go specific
+vendor/
+*.test
+*.out
+
+# Build artifacts
+main
+api-gateway
+
+# OS files
+.DS_Store
+Thumbs.db

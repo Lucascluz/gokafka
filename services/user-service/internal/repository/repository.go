@@ -2,10 +2,12 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	sharedModels "github.com/lucas/gokafka/shared/models"
+	"github.com/lucas/gokafka/shared/utils"
 	"github.com/lucas/gokafka/user-service/internal/models"
 )
 
@@ -14,7 +16,17 @@ type UserRepository struct {
 }
 
 func NewUserRepository() *UserRepository {
-	connStr := "postgres://postgres:postgres@localhost:5432/gokafka?sslmode=disable"
+	// Build connection string from environment variables
+	host := utils.GetEnvOrDefault("POSTGRES_HOST", "localhost")
+	port := utils.GetEnvOrDefault("POSTGRES_PORT", "5432")
+	dbname := utils.GetEnvOrDefault("POSTGRES_DB", "gokafka")
+	user := utils.GetEnvOrDefault("POSTGRES_USER", "postgres")
+	password := utils.GetEnvOrDefault("POSTGRES_PASSWORD", "postgres")
+
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		user, password, host, port, dbname)
+
+	log.Printf("Connecting to PostgreSQL at %s:%s", host, port)
 	db, err := sql.Open("postgres", connStr)
 
 	// Check for connection errors

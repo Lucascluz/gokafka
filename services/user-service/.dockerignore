@@ -1,0 +1,34 @@
+# Docker ignore for User Service
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temp files
+*.log
+*.pid
+tmp/
+temp/
+
+# Go specific
+vendor/
+*.test
+*.out
+
+# Build artifacts
+main
+user-service
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/lucas/gokafka/shared/models"
+	"github.com/lucas/gokafka/shared/utils"
 	"github.com/lucas/gokafka/user-service/internal/services"
 	"github.com/segmentio/kafka-go"
 )
@@ -17,14 +18,16 @@ type UserServiceHandler struct {
 }
 
 func NewUserServiceHandler(service *services.UserService) *UserServiceHandler {
+	broker := utils.GetEnvOrDefault("KAFKA_BROKERS", "localhost:9092")
+
 	return &UserServiceHandler{
 		service: service,
 		writer: kafka.NewWriter(kafka.WriterConfig{
-			Brokers: []string{"localhost:9092"},
+			Brokers: []string{broker},
 			// Remove Topic from here to allow per-message topic specification
 		}),
 		reader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers: []string{"localhost:9092"},
+			Brokers: []string{broker},
 			Topic:   "api-gateway-topic",
 			GroupID: "user-service-group",
 		}),

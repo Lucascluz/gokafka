@@ -1,16 +1,19 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lucas/gokafka/api-gateway/internal/handlers"
 	"github.com/lucas/gokafka/api-gateway/internal/middleware"
+	"github.com/lucas/gokafka/shared/utils"
 )
 
 func main() {
 	router := gin.Default()
 	handlers := handlers.NewHandler()
 
-	// Public routes
+	// Test endpoint
 	router.GET("/test", handlers.Test)
 
 	auth := router.Group("api/v1/auth")
@@ -41,5 +44,15 @@ func main() {
 		admin.DELETE("/users/:id", handlers.DeleteUser)
 	}
 
-	router.Run()
+	// health and ready
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
+	})
+
+	router.GET("/ready", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+	})
+
+	port := utils.GetEnvOrDefault("PORT", "8080")
+	router.Run(":" + port)
 }

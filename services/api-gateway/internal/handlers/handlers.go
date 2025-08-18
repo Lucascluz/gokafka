@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lucas/gokafka/shared/utils"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -19,10 +20,13 @@ type Handler struct {
 }
 
 func NewHandler() *Handler {
+
+	broker := utils.GetEnvOrDefault("KAFKA_BROKERS", "localhost:9092")
+
 	readers := []*kafka.Reader{
 		// user-service
 		kafka.NewReader(kafka.ReaderConfig{
-			Brokers: []string{"localhost:9092"},
+			Brokers: []string{broker},
 			Topic:   "user-service-topic",
 			GroupID: "api-gateway-group",
 		}),
@@ -30,7 +34,7 @@ func NewHandler() *Handler {
 	}
 	h := &Handler{
 		writer: kafka.NewWriter(kafka.WriterConfig{
-			Brokers:      []string{"localhost:9092"},
+			Brokers:      []string{broker},
 			Topic:        "api-gateway-topic",
 			RequiredAcks: int(kafka.RequireOne),
 		}),
