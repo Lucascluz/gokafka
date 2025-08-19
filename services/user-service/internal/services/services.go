@@ -132,3 +132,29 @@ func (s *UserService) GetUserProfile(userID string) (*sharedModels.UserData, err
 	}
 	return userResponse, nil
 }
+
+func (s *UserService) GetAllUserProfile() ([]*sharedModels.UserData, error) {
+
+	// Get user by ID
+	users, err := s.repo.GetAllUsers()
+	if err != nil || len(users) == 0 {
+		return nil, fmt.Errorf("no users found")
+	}
+
+	var userListResponse []*sharedModels.UserData
+	for _, user := range users {
+		// Create a copy of user without password for security
+		userResponse := &sharedModels.UserData{
+			ID:        user.ID,
+			Email:     user.Email,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		}
+
+		userListResponse = append(userListResponse, userResponse)
+	}
+
+	return userListResponse, nil
+}

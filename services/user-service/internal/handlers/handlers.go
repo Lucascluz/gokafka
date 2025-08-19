@@ -182,11 +182,37 @@ func (h *UserServiceHandler) ListenMessages() {
 					}
 				}
 			}
-		case "get-all":
-			// Handle get all users
-			resp = models.Response{
-				CorrelationID: req.CorrelationID,
-				Data:          "All users: ...", // Replace with actual data
+		case "list-user-profiles":
+			// Handle get profile logic here
+			result, err := h.service.GetAllUserProfile()
+			if err != nil {
+				log.Printf("Failed to list user profiles: %v", err)
+				resp = models.Response{
+					CorrelationID: req.CorrelationID,
+					Success:       false,
+					Error:         err.Error(),
+				}
+			} else {
+				// Create response structure
+				// Convert []*models.UserData to []models.UserData
+				userDataVals := make([]models.UserData, len(result))
+				for i, u := range result {
+					if u != nil {
+						userDataVals[i] = *u
+					}
+				}
+				profileListResponse := models.ListProfileResponse{
+					Status: "success",
+					Data:   userDataVals,
+				}
+
+				// Return success response with user list
+				resultBytes, _ := json.Marshal(profileListResponse)
+				resp = models.Response{
+					CorrelationID: req.CorrelationID,
+					Success:       true,
+					Data:          string(resultBytes),
+				}
 			}
 		default:
 			resp = models.Response{

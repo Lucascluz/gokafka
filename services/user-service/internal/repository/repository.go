@@ -4,10 +4,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq" // PostgreSQL driver
 	sharedModels "github.com/lucas/gokafka/shared/models"
 	"github.com/lucas/gokafka/shared/utils"
+	"github.com/lucas/gokafka/user-service/internal/auth"
 	"github.com/lucas/gokafka/user-service/internal/models"
 )
 
@@ -65,7 +68,50 @@ func (r *UserRepository) createTableIfNotExists() {
 		log.Fatalf("failed to create users table: %v", err)
 	}
 
+	// Ensure admin user exists
+	if err := r.InsertAdminUser(); err != nil {
+		log.Fatalf("failed to ensure admin user exists: %v", err)
+	}
+
+	// Ensure users table is ready
 	log.Println("Users table ready")
+}
+
+func (r *UserRepository) InsertAdminUser() error {
+
+	// Create base admin user
+	adminID := uuid.New().String()
+	adminEmail := utils.GetEnvOrDefault("ADMIN_EMAIL", "admin@example.com")
+
+	hashedAdminPassword, err := auth.HashPassword("admin123")
+	if err != nil {
+		log.Fatalf("failed to hash default admin password: %v", err)
+	}
+
+	adminPassword := utils.GetEnvOrDefault("ADMIN_PASSWORD", hashedAdminPassword)
+	adminFirstName := utils.GetEnvOrDefault("ADMIN_FIRST_NAME", "Admin")
+	adminLastName := utils.GetEnvOrDefault("ADMIN_LAST_NAME", "User")
+	adminCreatedAt := utils.GetEnvOrDefault("ADMIN_CREATED_AT", time.Now().Format(time.RFC3339))
+	adminUpdatedAt := utils.GetEnvOrDefault("ADMIN_UPDATED_AT", time.Now().Format(time.RFC3339))
+
+	query := `
+	INSERT INTO users (id, email, password, first_name, last_name, created_at, updated_at, role)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, 'admin')
+	`
+
+	if _, err := r.db.Exec(query, adminID, adminEmail, adminPassword, adminFirstName, adminLastName, adminCreatedAt, adminUpdatedAt); err != nil {
+		if err.Error() != "pq: duplicate key value violates unique constraint \"users_email_key\"" {
+			log.Fatalf("failed to insert admin user: %v", err)
+			return err
+		} else {
+			log.Println("Admin user already exists, skipping insert")
+			return nil
+
+		}
+	} else {
+		log.Println("Admin user created successfully")
+		return nil
+	}
 }
 
 func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {

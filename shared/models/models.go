@@ -34,3 +34,8 @@ type GetProfileResponse struct {
 	Status string   `json:"status"`
 	Data   UserData `json:"data"`
 }
+
+type ListProfileResponse struct {
+	Status string     `json:"status"`
+	Data   []UserData `json:"data"`
+}

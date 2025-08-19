@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -72,6 +73,8 @@ func (ms *MessagingService) SendAndWait(req SendRequest) (*SendResponse, error) 
 		ReplyTo:       req.ReplyTo,
 		Payload:       string(payloadBytes),
 	}
+
+	log.Printf("Sending message with correlationID: %s and type: %s", correlationID, req.Type)
 
 	// Send message to service via Kafka
 	reqBytes, _ := json.Marshal(kafkaReq)

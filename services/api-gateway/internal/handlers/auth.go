@@ -9,6 +9,7 @@ import (
 )
 
 func (h *Handler) RegisterUser(c *gin.Context) {
+	
 	// Initialize helper services
 	validator := NewValidator(c)
 	respHandler := NewResponseHandler(c)

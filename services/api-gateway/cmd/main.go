@@ -40,8 +40,8 @@ func main() {
 	admin.Use(middleware.AuthMiddleware())
 	admin.Use(middleware.RequireRole("admin"))
 	{
-		admin.GET("/users", handlers.ListUsers)
-		admin.DELETE("/users/:id", handlers.DeleteUser)
+		admin.GET("/users", handlers.ListUserProfiles)
+		admin.DELETE("/users/:id", handlers.DeleteUserProfile)
 	}
 
 	// health and ready
