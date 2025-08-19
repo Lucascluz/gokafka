@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lucas/gokafka/api-gateway/internal/cache"
 	"github.com/lucas/gokafka/shared/utils"
 	"github.com/segmentio/kafka-go"
 )
@@ -17,6 +18,7 @@ type Handler struct {
 	readers       []*kafka.Reader
 	responseChans map[string]chan []byte
 	mu            sync.Mutex
+	blacklist     *cache.TokenBlacklist
 }
 
 func NewHandler() *Handler {
@@ -40,6 +42,7 @@ func NewHandler() *Handler {
 		}),
 		readers:       readers,
 		responseChans: make(map[string]chan []byte),
+		blacklist:     cache.NewTokenBlacklist(),
 	}
 	for _, reader := range h.readers {
 		go h.listenResponses(reader)

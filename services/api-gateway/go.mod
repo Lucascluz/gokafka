@@ -35,6 +35,7 @@ require (
 
 require (
 	github.com/gin-gonic/gin v1.10.1
+	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.15.9 // indirect

@@ -12,6 +12,7 @@ import (
 func main() {
 	router := gin.Default()
 	handlers := handlers.NewHandler()
+	middleware := middleware.NewAuthMiddleware()
 
 	// Test endpoint
 	router.GET("/test", handlers.Test)
@@ -21,7 +22,7 @@ func main() {
 		auth.POST("/register", handlers.RegisterUser)
 		auth.POST("/login", handlers.LoginUser)
 
-		auth.Use(middleware.AuthMiddleware())
+		auth.Use(middleware.AuthMiddleware(true))
 		{
 			auth.POST("/logout", handlers.LogoutUser)
 		}
@@ -29,7 +30,7 @@ func main() {
 
 	// Protected routes for authenticated users
 	api := router.Group("api/v1")
-	api.Use(middleware.AuthMiddleware())
+	api.Use(middleware.AuthMiddleware(true))
 	{
 		api.GET("/profile", handlers.GetUserProfile)
 		api.PUT("/profile", handlers.UpdateUserProfile)
@@ -37,7 +38,7 @@ func main() {
 
 	// Admin-only routes
 	admin := router.Group("api/v1/admin")
-	admin.Use(middleware.AuthMiddleware())
+	admin.Use(middleware.AuthMiddleware(true))
 	admin.Use(middleware.RequireRole("admin"))
 	{
 		admin.GET("/users", handlers.ListUserProfiles)
