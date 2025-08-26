@@ -12,13 +12,29 @@ import (
 	"github.com/lucas/gokafka/user-service/internal/repository"
 )
 
+const (
+	DefaultUserRole = "user"
+)
+
 type UserService struct {
-	repo repository.UserRepository
+	repo *repository.UserRepository
 }
 
 func NewUserService(repo *repository.UserRepository) *UserService {
 	return &UserService{
-		repo: *repo,
+		repo: repo,
+	}
+}
+
+// Helper method to convert internal User to shared UserData (without password)
+func (s *UserService) userToUserData(user *userModels.User) *sharedModels.UserData {
+	return &sharedModels.UserData{
+		ID:        user.ID,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
 }
 
@@ -49,7 +65,7 @@ func (s *UserService) RegisterUser(req sharedModels.RegisterRequest) (*userModel
 		LastName:  req.LastName,
 		CreatedAt: time.Now().Format(time.RFC3339),
 		UpdatedAt: time.Now().Format(time.RFC3339),
-		Role:      "user", // Default role
+		Role:      DefaultUserRole,
 	}
 
 	// Save user to repository
@@ -57,8 +73,8 @@ func (s *UserService) RegisterUser(req sharedModels.RegisterRequest) (*userModel
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Create a copy of user without password for security
-	userResponse := &userModels.User{
+	// Return user without password for security
+	return &userModels.User{
 		ID:        user.ID,
 		Email:     user.Email,
 		Password:  "", // Don't return password
@@ -67,8 +83,7 @@ func (s *UserService) RegisterUser(req sharedModels.RegisterRequest) (*userModel
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Role:      user.Role,
-	}
-	return userResponse, nil
+	}, nil
 }
 
 func (s *UserService) LoginUser(req sharedModels.LoginRequest) (*sharedModels.LoginResponse, error) {
@@ -115,45 +130,26 @@ func (s *UserService) GetUserProfile(userID string) (*sharedModels.UserData, err
 	}
 
 	// Get user by ID
-	users, err := s.repo.GetUserByID(userID)
-	if err != nil || len(users) == 0 {
+	user, err := s.repo.GetUserByID(userID)
+	if err != nil {
 		return nil, fmt.Errorf("user not found")
 	}
-	user := users[0]
 
-	// Create a copy of user without password for security
-	userResponse := &sharedModels.UserData{
-		ID:        user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-	return userResponse, nil
+	return user, nil
 }
 
 func (s *UserService) GetAllUserProfile() ([]*sharedModels.UserData, error) {
-
-	// Get user by ID
+	// Get all users
 	users, err := s.repo.GetAllUsers()
 	if err != nil || len(users) == 0 {
 		return nil, fmt.Errorf("no users found")
 	}
 
-	var userListResponse []*sharedModels.UserData
+	userListResponse := make([]*sharedModels.UserData, 0, len(users))
 	for _, user := range users {
-		// Create a copy of user without password for security
-		userResponse := &sharedModels.UserData{
-			ID:        user.ID,
-			Email:     user.Email,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
+		if user != nil {
+			userListResponse = append(userListResponse, s.userToUserData(user))
 		}
-
-		userListResponse = append(userListResponse, userResponse)
 	}
 
 	return userListResponse, nil

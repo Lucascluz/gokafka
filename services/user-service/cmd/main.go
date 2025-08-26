@@ -10,33 +10,45 @@ import (
 	"github.com/lucas/gokafka/user-service/internal/services"
 )
 
-func main() {
+const (
+	DefaultPort = "8081"
+)
 
+func main() {
 	log.Println("Starting user-service...")
 
-	// Initialize the user repository
+	// Initialize dependencies
 	repo := repository.NewUserRepository()
-
-	// Initialize the user service
 	service := services.NewUserService(repo)
-
-	// Initialize the user service handler
 	handler := handlers.NewUserServiceHandler(service)
 
 	log.Println("User-service started, waiting for requests...")
+
+	// Start Kafka message listener in background
 	go handler.ListenMessages()
 
-	// Start http server
+	// Start HTTP server
+	startHTTPServer()
+}
+
+func startHTTPServer() {
 	router := gin.Default()
 
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "healthy"})
-	})
+	// Health endpoints
+	router.GET("/health", healthHandler)
+	router.GET("/ready", readyHandler)
 
-	router.GET("/ready", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ready"})
-	})
+	port := utils.GetEnvOrDefault("PORT", DefaultPort)
+	log.Printf("Starting HTTP server on port %s", port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("Failed to start HTTP server: %v", err)
+	}
+}
 
-	port := utils.GetEnvOrDefault("PORT", "8081")
-	router.Run(":" + port)
+func healthHandler(c *gin.Context) {
+	c.JSON(200, gin.H{"status": "healthy"})
+}
+
+func readyHandler(c *gin.Context) {
+	c.JSON(200, gin.H{"status": "ready"})
 }

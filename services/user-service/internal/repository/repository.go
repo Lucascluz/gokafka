@@ -14,11 +14,29 @@ import (
 	"github.com/lucas/gokafka/user-service/internal/models"
 )
 
+// Database constants
+const (
+	DefaultAdminEmail     = "admin@example.com"
+	DefaultAdminPassword  = "admin123"
+	DefaultAdminFirstName = "Admin"
+	DefaultAdminLastName  = "User"
+	DefaultUserRole       = "user"
+	AdminRole             = "admin"
+)
+
 type UserRepository struct {
 	db *sql.DB
 }
 
 func NewUserRepository() *UserRepository {
+	db := initDatabase()
+	repo := &UserRepository{db: db}
+	repo.createTableIfNotExists()
+	return repo
+}
+
+// initDatabase initializes the database connection
+func initDatabase() *sql.DB {
 	// Build connection string from environment variables
 	host := utils.GetEnvOrDefault("POSTGRES_HOST", "localhost")
 	port := utils.GetEnvOrDefault("POSTGRES_PORT", "5432")
@@ -31,8 +49,6 @@ func NewUserRepository() *UserRepository {
 
 	log.Printf("Connecting to PostgreSQL at %s:%s", host, port)
 	db, err := sql.Open("postgres", connStr)
-
-	// Check for connection errors
 	if err != nil {
 		log.Fatalf("failed to connect to postgres: %v", err)
 	}
@@ -43,12 +59,7 @@ func NewUserRepository() *UserRepository {
 	}
 
 	log.Println("Connected to PostgreSQL database")
-
-	// Create users table if it doesn't exist
-	repo := &UserRepository{db: db}
-	repo.createTableIfNotExists()
-
-	return repo
+	return db
 }
 
 func (r *UserRepository) createTableIfNotExists() {
@@ -78,40 +89,44 @@ func (r *UserRepository) createTableIfNotExists() {
 }
 
 func (r *UserRepository) InsertAdminUser() error {
-
 	// Create base admin user
 	adminID := uuid.New().String()
-	adminEmail := utils.GetEnvOrDefault("ADMIN_EMAIL", "admin@example.com")
+	adminEmail := utils.GetEnvOrDefault("ADMIN_EMAIL", DefaultAdminEmail)
 
-	hashedAdminPassword, err := auth.HashPassword("admin123")
+	hashedAdminPassword, err := auth.HashPassword(DefaultAdminPassword)
 	if err != nil {
-		log.Fatalf("failed to hash default admin password: %v", err)
+		return fmt.Errorf("failed to hash default admin password: %w", err)
 	}
 
 	adminPassword := utils.GetEnvOrDefault("ADMIN_PASSWORD", hashedAdminPassword)
-	adminFirstName := utils.GetEnvOrDefault("ADMIN_FIRST_NAME", "Admin")
-	adminLastName := utils.GetEnvOrDefault("ADMIN_LAST_NAME", "User")
+	adminFirstName := utils.GetEnvOrDefault("ADMIN_FIRST_NAME", DefaultAdminFirstName)
+	adminLastName := utils.GetEnvOrDefault("ADMIN_LAST_NAME", DefaultAdminLastName)
 	adminCreatedAt := utils.GetEnvOrDefault("ADMIN_CREATED_AT", time.Now().Format(time.RFC3339))
 	adminUpdatedAt := utils.GetEnvOrDefault("ADMIN_UPDATED_AT", time.Now().Format(time.RFC3339))
 
 	query := `
 	INSERT INTO users (id, email, password, first_name, last_name, created_at, updated_at, role)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, 'admin')
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	ON CONFLICT (email) DO NOTHING
 	`
 
-	if _, err := r.db.Exec(query, adminID, adminEmail, adminPassword, adminFirstName, adminLastName, adminCreatedAt, adminUpdatedAt); err != nil {
-		if err.Error() != "pq: duplicate key value violates unique constraint \"users_email_key\"" {
-			log.Fatalf("failed to insert admin user: %v", err)
-			return err
-		} else {
-			log.Println("Admin user already exists, skipping insert")
-			return nil
-
-		}
-	} else {
-		log.Println("Admin user created successfully")
-		return nil
+	result, err := r.db.Exec(query, adminID, adminEmail, adminPassword, adminFirstName, adminLastName, adminCreatedAt, adminUpdatedAt, AdminRole)
+	if err != nil {
+		return fmt.Errorf("failed to insert admin user: %w", err)
 	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected > 0 {
+		log.Println("Admin user created successfully")
+	} else {
+		log.Println("Admin user already exists, skipping insert")
+	}
+
+	return nil
 }
 
 func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
@@ -147,7 +162,7 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 	return err
 }
 
-func (r *UserRepository) GetUserByID(id string) ([]*sharedModels.UserData, error) {
+func (r *UserRepository) GetUserByID(id string) (*sharedModels.UserData, error) {
 	query := `
 		SELECT id, email, first_name, last_name, created_at, updated_at 
 		FROM users WHERE id = $1
@@ -163,7 +178,7 @@ func (r *UserRepository) GetUserByID(id string) ([]*sharedModels.UserData, error
 		return nil, err
 	}
 
-	return []*sharedModels.UserData{&user}, nil
+	return &user, nil
 }
 
 func (r *UserRepository) GetAllUsers() ([]*models.User, error) {
