@@ -14,7 +14,6 @@ func main() {
 	handlers := handlers.NewHandler()
 	middleware := middleware.NewAuthMiddleware()
 
-
 	auth := router.Group("api/v1/auth")
 	{
 		auth.POST("/register", handlers.RegisterUser)
@@ -30,8 +29,13 @@ func main() {
 	api := router.Group("api/v1")
 	api.Use(middleware.AuthMiddleware(true))
 	{
+		// User routes
 		api.GET("/profile", handlers.GetUserProfile)
 		api.PUT("/profile", handlers.UpdateUserProfile)
+		
+		// Product routes for authenticated users
+		api.GET("/products", handlers.ListProducts)
+		api.GET("/products/:id", handlers.GetProduct)
 	}
 
 	// Admin-only routes
@@ -39,8 +43,14 @@ func main() {
 	admin.Use(middleware.AuthMiddleware(true))
 	admin.Use(middleware.RequireRole("admin"))
 	{
+		// User management
 		admin.GET("/users", handlers.ListUserProfiles)
 		admin.DELETE("/users/:id", handlers.DeleteUserProfile)
+		
+		// Product management
+		admin.POST("/products", handlers.CreateProduct)
+		admin.PUT("/products/:id", handlers.UpdateProduct)
+		admin.DELETE("/products/:id", handlers.DeleteProduct)
 	}
 
 	// health and ready

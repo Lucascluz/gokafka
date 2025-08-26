@@ -39,3 +39,50 @@ type ListProfileResponse struct {
 	Status string     `json:"status"`
 	Data   []UserData `json:"data"`
 }
+
+// Product-related models
+type ProductData struct {
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+}
+
+type CreateProductRequest struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+}
+
+type UpdateProductRequest struct {
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+}
+
+type GetProductRequest struct {
+	ID int `json:"id"`
+}
+
+type DeleteProductRequest struct {
+	ID int `json:"id"`
+}
+
+type GetProductResponse struct {
+	Status string      `json:"status"`
+	Data   ProductData `json:"data"`
+}
+
+type ListProductResponse struct {
+	Status string        `json:"status"`
+	Data   []ProductData `json:"data"`
+}
+
+type ProductResponse struct {
+	Status  string      `json:"status"`
+	Message string      `json:"message"`
+	Data    ProductData `json:"data"`
+}
