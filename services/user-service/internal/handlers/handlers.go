@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/lucas/gokafka/shared/models"
 	"github.com/lucas/gokafka/shared/utils"
@@ -50,6 +51,20 @@ func (h *UserServiceHandler) ListenMessages() {
 
 		var resp models.Response
 		switch req.Type {
+		case "health":
+			// Return healthy response with JSON format
+			healthResponse := map[string]interface{}{
+				"service":   "user-service",
+				"status":    "healthy",
+				"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+			}
+			healthBytes, _ := json.Marshal(healthResponse)
+			resp = models.Response{
+				CorrelationID: req.CorrelationID,
+				Success:       true,
+				Data:          string(healthBytes),
+			}
+
 		case "register":
 			// Parse the registration request from payload
 			var registerReq models.RegisterRequest

@@ -14,8 +14,6 @@ func main() {
 	handlers := handlers.NewHandler()
 	middleware := middleware.NewAuthMiddleware()
 
-	// Test endpoint
-	router.GET("/test", handlers.Test)
 
 	auth := router.Group("api/v1/auth")
 	{
@@ -46,9 +44,7 @@ func main() {
 	}
 
 	// health and ready
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
-	})
+	router.GET("/health", handlers.Health)
 
 	router.GET("/ready", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})

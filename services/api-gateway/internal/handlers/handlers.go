@@ -32,6 +32,12 @@ func NewHandler() *Handler {
 			Topic:   "user-service-topic",
 			GroupID: "api-gateway-group",
 		}),
+		// product-service
+		kafka.NewReader(kafka.ReaderConfig{
+			Brokers: []string{broker},
+			Topic:   "product-service-topic",
+			GroupID: "api-gateway-group",
+		}),
 		// add new readers here
 	}
 	h := &Handler{
@@ -72,29 +78,44 @@ func (h *Handler) listenResponses(reader *kafka.Reader) {
 	}
 }
 
-func (h *Handler) Test(c *gin.Context) {
-	// Initialize helper services
-	respHandler := NewResponseHandler(c)
-	messaging := NewMessagingService(h)
-
-	// Send test message
-	resp, err := messaging.SendAndWait(SendRequest{
-		Type:    "test",
-		Payload: "hello world",
-		Key:     "key",
-		ReplyTo: "user-service-topic",
-		Timeout: 5 * time.Second,
-	})
-	if err != nil {
-		respHandler.HandleError(http.StatusInternalServerError, err.Error())
-		return
+func (h *Handler) Health(c *gin.Context) {
+	// Send health check to all the services
+	services := []string{"user-service", "product-service"} // add new services here
+	var wg sync.WaitGroup
+	responses := make([]map[string]interface{}, len(services))
+	errors := make([]string, len(services))
+	for i, service := range services {
+		wg.Add(1)
+		go func(i int, service string) {
+			defer wg.Done()
+			messaging := NewMessagingService(h)
+			resp, err := messaging.SendAndWait(SendRequest{
+				Type:    "health",
+				Payload: "",
+				Key:     "key",
+				ReplyTo: service + "-topic",
+				Timeout: 5 * time.Second,
+			})
+			if err != nil {
+				errors[i] = service + ": " + err.Error()
+				return
+			}
+			var respObj map[string]interface{}
+			if err := json.Unmarshal([]byte(resp.Data), &respObj); err != nil {
+				errors[i] = service + ": invalid response format"
+				return
+			}
+			responses[i] = respObj
+		}(i, service)
 	}
+	wg.Wait()
 
-	// Return raw response for test endpoint
-	var respObj map[string]interface{}
-	if err := json.Unmarshal([]byte(resp.Data), &respObj); err != nil {
-		respHandler.HandleError(http.StatusInternalServerError, "invalid response format")
-		return
+	// Compile final response
+	finalResp := map[string]interface{}{
+		"status":    "ok",
+		"services":  responses,
+		"errors":    errors,
+		"timestamp": time.Now().UTC(),
 	}
-	c.JSON(http.StatusOK, respObj)
+	c.JSON(http.StatusOK, finalResp)
 }
